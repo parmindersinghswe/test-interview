@@ -15,7 +15,7 @@
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
     "noEmit": true,
     "module": "ESNext",
-    "target": "es2015", // ✅ Added
+    "target": "ES2022", // ✅ Added
     "downlevelIteration": true, // ✅ Added
     "strict": true,
     "lib": [

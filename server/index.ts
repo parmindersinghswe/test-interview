@@ -65,7 +65,7 @@ app.use((req, res, next) => {
 });
 
 // ✅ Async server setup
-(async () => {
+//(async () => {
   const useSimpleRoutesEnv = process.env.USE_SIMPLE_ROUTES;
   const useSimpleRoutes = useSimpleRoutesEnv
     ? useSimpleRoutesEnv === 'true'
@@ -101,7 +101,7 @@ app.use((req, res, next) => {
   // server.listen(5000, '127.0.0.1', () => {
   //   log(`✅ Server running at http://127.0.0.1:${port}`);
   // });
-})();
+//})();
 
   export default serverless(app);
   
