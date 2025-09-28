@@ -12,7 +12,7 @@ import crypto from 'crypto';
 // Simple in-memory admin sessions
 const adminSessions = new Map<string, any>();
 
-export async function registerSimpleRoutes(app: Express): Promise<Express> {
+export function registerSimpleRoutes(app: Express): Express {
 
   // Simple admin login - no complex session middleware
   app.post('/api/admin-login', async (req, res) => {

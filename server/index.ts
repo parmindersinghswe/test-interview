@@ -7,6 +7,7 @@ import * as dotenv from "dotenv";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import serverless from 'serverless-http';
+import { registerSimpleRoutes } from "./routes-simple";
 
 // ES Module-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -73,10 +74,9 @@ app.use((req, res, next) => {
 
   let server;
   if (useSimpleRoutes || !process.env.STRIPE_SECRET_KEY) {
-    const { registerSimpleRoutes } = await import('./routes-simple');
-    server = await registerSimpleRoutes(app);
+    server = registerSimpleRoutes(app);
   } else {
-    server = await registerRoutes(app);
+    server = registerRoutes(app);
   }
 
   // Error handler

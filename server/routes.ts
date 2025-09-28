@@ -74,7 +74,7 @@ const isAdmin = async (req: any, res: any, next: any) => {
   next();
 };
 
-export async function registerRoutes(app: Express): Promise<Express> {
+export function registerRoutes(app: Express): Express {
   // Simple in-memory session store for demo
   const activeSessions = new Map<string, any>();
   
