@@ -1,0 +1,101 @@
+import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import compression from "compression";
+import { registerRoutes } from "./routes";
+import { setupVite, serveStatic, log } from "./vite";
+import * as dotenv from "dotenv";
+import * as path from "path";
+import { fileURLToPath } from "url";
+
+// ES Module-compatible __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ✅ Load .env.local
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(compression());
+
+// ✅ Session configuration
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  throw new Error('Environment variable SESSION_SECRET is required');
+}
+app.use(session({
+  secret: sessionSecret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV !== 'development',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// ✅ API request logger middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  const path = req.path;
+  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+
+  const originalResJson = res.json;
+  res.json = function (bodyJson, ...args) {
+    capturedJsonResponse = bodyJson;
+    return originalResJson.apply(res, [bodyJson, ...args]);
+  };
+
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    if (path.startsWith("/api")) {
+      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+      if (capturedJsonResponse) {
+        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      }
+      if (logLine.length > 80) {
+        logLine = logLine.slice(0, 79) + "…";
+      }
+      log(logLine);
+    }
+  });
+
+  next();
+});
+
+// ✅ Async server setup
+(async () => {
+  const useSimpleRoutesEnv = process.env.USE_SIMPLE_ROUTES;
+  const useSimpleRoutes = useSimpleRoutesEnv
+    ? useSimpleRoutesEnv === 'true'
+    : app.get('env') !== 'production';
+
+  let server;
+  if (useSimpleRoutes || !process.env.STRIPE_SECRET_KEY) {
+    const { registerSimpleRoutes } = await import('./routes-simple');
+    server = await registerSimpleRoutes(app);
+  } else {
+    server = await registerRoutes(app);
+  }
+
+  // Error handler
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+    res.status(status).json({ message });
+    throw err;
+  });
+
+  // ✅ Vite dev server for development only
+  if (app.get("env") === "development") {
+    await setupVite(app, server);
+  } else {
+    serveStatic(app);
+  }
+
+  // ✅ Final: Force IPv4 for Windows compatibility
+  const port = Number(process.env.PORT) || 5000;
+  server.listen(5000, '127.0.0.1', () => {
+    log(`✅ Server running at http://127.0.0.1:${port}`);
+  });
+})();
