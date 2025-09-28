@@ -8,6 +8,7 @@ import { MaterialCard } from '@/components/MaterialCard';
 import type { Material } from '@shared/schema';
 import { Search, Filter } from 'lucide-react';
 import { SEO } from '@/components/SEO';
+import { DEFAULT_IMAGE_URL, buildSiteUrl } from '@/lib/site';
 
 export default function Materials() {
 
@@ -38,7 +39,9 @@ export default function Materials() {
       <SEO
         title="Interview Materials"
         description="Browse our curated tech interview questions by technology and difficulty."
-        url="https://www.techinterviewnotes.com/materials"
+        url={buildSiteUrl('/materials')}
+        image={DEFAULT_IMAGE_URL}
+        type="website"
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* SEO-Optimized Header */}

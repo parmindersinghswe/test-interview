@@ -10,6 +10,7 @@ import type { Material, Purchase } from '@shared/schema';
 import { Download, BookOpen, Calendar, Star } from 'lucide-react';
 import { SEO } from '@/components/SEO';
 import { FaQuestion } from 'react-icons/fa';
+import { DEFAULT_IMAGE_URL, buildSiteUrl } from '@/lib/site';
 
 export default function MyPurchases() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -29,7 +30,7 @@ export default function MyPurchases() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/auth";
+        window.location.href = "/login";
       }, 500);
       return;
     }
@@ -83,9 +84,7 @@ export default function MyPurchases() {
 
       // Make API call to get the actual PDF file
       const response = await fetch(`/api/materials/${material.id}/download`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-        },
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -125,9 +124,7 @@ export default function MyPurchases() {
 
       // Fetch the PDF content
       const response = await fetch(`/api/materials/${material.id}/view`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-        },
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -168,7 +165,13 @@ export default function MyPurchases() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-900 py-8">
-      <SEO title="My Purchases" url="https://www.techinterviewnotes.com/my-purchases" />
+      <SEO
+        title="My Purchases"
+        description="Review and download your purchased interview materials."
+        url={buildSiteUrl('/my-purchases')}
+        image={DEFAULT_IMAGE_URL}
+        type="website"
+      />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-8">
@@ -238,6 +241,7 @@ export default function MyPurchases() {
                           src={purchase.material.imageUrl || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=200'}
                           alt={purchase.material.title}
                           className="w-24 h-24 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                          loading="lazy"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.src = 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=200';

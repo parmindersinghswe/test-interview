@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChevronDown, ChevronRight, Search, Download, CreditCard, Shield, BookOpen, Users } from 'lucide-react';
 import { SEO } from '@/components/SEO';
+import { DEFAULT_IMAGE_URL, buildSiteUrl } from '@/lib/site';
 
 interface FAQItem {
   id: string;
@@ -99,7 +100,9 @@ export default function HelpCenter() {
       <SEO
         title="Help Center"
         description="Frequently asked questions and support for Tech Interview Notes."
-        url="https://www.techinterviewnotes.com/help"
+        url={buildSiteUrl('/help')}
+        image={DEFAULT_IMAGE_URL}
+        type="website"
       />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* SEO-Optimized Header */}

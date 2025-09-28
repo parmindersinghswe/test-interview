@@ -9,7 +9,60 @@ import { useQuery } from '@tanstack/react-query';
 import type { Material } from '@shared/schema';
 import jsPDF from 'jspdf';
 import { SEO } from '@/components/SEO';
-import axios from 'axios';
+import { DEFAULT_IMAGE_URL, buildSiteUrl } from '@/lib/site';
+type CurrentUser = {
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+};
+
+type CreateOrderResponse = {
+  paymentOrder?: {
+    id?: string;
+    amount?: number;
+    currency?: string;
+  };
+  key_id?: string;
+};
+
+type VerifyPaymentResponse = {
+  verified?: boolean;
+  msg?: string;
+};
+
+type FetchJsonOptions = RequestInit & {
+  timeoutMs?: number;
+};
+
+async function fetchJson<T>(input: RequestInfo | URL, options: FetchJsonOptions = {}): Promise<T> {
+  const { timeoutMs, ...init } = options;
+  const controller = typeof timeoutMs === "number" ? new AbortController() : undefined;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  if (controller) {
+    timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  }
+
+  try {
+    const response = await fetch(input, controller ? { ...init, signal: controller.signal } : init);
+
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+
+    const contentType = response.headers.get("content-type");
+
+    if (response.status === 204 || !contentType?.includes("application/json")) {
+      return undefined as T;
+    }
+
+    return (await response.json()) as T;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
 
 
 
@@ -47,6 +100,12 @@ declare global {
 }
 type Prefill = { name: string; email: string };
 
+const envVars = import.meta.env as unknown as Record<string, string | undefined>;
+const CHECKOUT_BRAND_NAME = envVars.VITE_BRAND_NAME?.trim() || 'DevInterview Pro';
+const CHECKOUT_DESCRIPTION =
+  envVars.VITE_CHECKOUT_DESCRIPTION?.trim() ||
+  'Secure checkout for DevInterview Pro digital interview materials.';
+
 // ---- Utils ----
 function loadScript(src: string): Promise<boolean> {
   return new Promise((res) => {
@@ -66,8 +125,7 @@ export default function Checkout() {
   const [emailTouched, setEmailTouched] = useState(false);
   const emailRegex = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/, []);
   const isGuestEmailValid = useMemo(() => emailRegex.test(guestEmail.trim()), [guestEmail, emailRegex]);
-  const token = localStorage.getItem("authToken");
-  const requireGuestEmail = !token;
+  const requireGuestEmail = !isAuthenticated;
   // Get material ID from URL params
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -242,19 +300,17 @@ export default function Checkout() {
     pdf.save(fileName);
   };
 
-  async function buildPrefill(token?: string | null): Promise<Prefill> {
+  async function buildPrefill(): Promise<Prefill> {
     const EMPTY: Prefill = { name: "", email: "" };
-    if (!token) return {name: "", email: requireGuestEmail ? guestEmail.trim() : ""};
+    if (!isAuthenticated) return { name: "", email: requireGuestEmail ? guestEmail.trim() : "" };
 
     try {
-      const res = await axios.get("/api/current-user", {
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: 4000,
-        // Only treat 2xx as success; anything else falls to catch via throw
-        validateStatus: (s) => s >= 200 && s < 300,
+      const user = await fetchJson<CurrentUser>("/api/current-user", {
+        credentials: "include",
+        timeoutMs: 4000,
       });
 
-      const { firstName, lastName, email } = res.data ?? {};
+      const { firstName, lastName, email } = user ?? {};
       const safeEmail = typeof email === "string" ? email.trim() : "";
       const safeName = [firstName, lastName]
         .filter((v) => typeof v === "string" && v.trim().length > 0)
@@ -286,47 +342,55 @@ export default function Checkout() {
     }
 
     try {
-      const result = await axios.post(`/create-order`, { amount: totalINR, });
-      const {paymentOrder, key_id} = result.data;
-      debugger;
-      if (!paymentOrder?.id) {
-        alert('Server error: missing order id');
+      const orderResult = await fetchJson<CreateOrderResponse>(`/create-order`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ amount: totalINR }),
+      });
+      const { paymentOrder, key_id } = orderResult ?? {};
+      if (!paymentOrder?.id || !key_id) {
+        alert('Server error: missing order details');
         return;
       }
 
-      const { amount, id: order_id, currency } = paymentOrder;
-      const prefill = await buildPrefill(token);
+      const { amount, id: order_id } = paymentOrder;
+      const currency = paymentOrder.currency ?? 'INR';
+      const prefill = await buildPrefill();
 
       const options: RazorpayOptions = {
         key: key_id,
         amount: String(amount),
         currency,
-        name: 'Algoforge Technologies',
-        description: 'Test transaction',
+        name: CHECKOUT_BRAND_NAME,
+        description: CHECKOUT_DESCRIPTION,
         order_id,
         handler: async (response) => {
           try {
-            debugger;
-            const verify = await axios.post(`/confirm-success`, {
-              orderCreationId: order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-              materialIds: [materialId],
-              customerEmail: requireGuestEmail ? guestEmail.trim() : undefined,
-            },
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`, // replace with your real token
-                },
-              }
-            );
-            debugger;
+            const verify = await fetchJson<VerifyPaymentResponse>(`/confirm-success`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              credentials: "include",
+              body: JSON.stringify({
+                razorpayOrderId: response.razorpay_order_id || order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+                materialIds: materialId ? [materialId] : [],
+                customerEmail: requireGuestEmail ? guestEmail.trim() : undefined,
+              }),
+            });
             if (!material) return;
+            const verificationMessage = verify?.msg ?? "Unable to verify payment. Please contact support.";
             toast({
               title: "Payment Verification",
-              description: verify.data.msg,
+              description: verificationMessage,
+              variant: verify?.verified ? "default" : "destructive",
             });
-            if (verify.data.verified) {
+            if (verify?.verified) {
               setTimeout(() => {
                 downloadActualPDF(material);
                 toast({
@@ -336,8 +400,7 @@ export default function Checkout() {
               }, 1500);
             }
           } catch (err: unknown) {
-            debugger;
-            console.error(err);
+            console.error('Payment verification error:', err);
             alert('Verification failed');
           }
         },
@@ -348,7 +411,7 @@ export default function Checkout() {
       const paymentObj = new window.Razorpay(options);
       paymentObj.open();
     } catch (err: unknown) {
-      console.error(err);
+      console.error('Order creation failed:', err);
       alert('Failed to create order');
     }
   };
@@ -378,7 +441,13 @@ export default function Checkout() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <SEO title="Checkout" url="https://www.techinterviewnotes.com/checkout" />
+      <SEO
+        title="Checkout"
+        description="Complete your purchase and access premium interview materials."
+        url={buildSiteUrl('/checkout')}
+        image={DEFAULT_IMAGE_URL}
+        type="website"
+      />
       <h1 className="text-3xl font-bold mb-8 text-center">Complete Your Purchase</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

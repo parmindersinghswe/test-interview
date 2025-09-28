@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { SEO } from '@/components/SEO';
+import { DEFAULT_IMAGE_URL, buildSiteUrl } from '@/lib/site';
+import { getCsrfToken } from '@/lib/csrf';
 
 export default function TestLogin() {
   const [, setLocation] = useLocation();
@@ -20,12 +22,15 @@ export default function TestLogin() {
 
   const loginMutation = useMutation({
     mutationFn: async (loginData: { username: string; password: string }) => {
+      const csrfToken = getCsrfToken();
       const response = await fetch('/api/admin-login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
         },
         body: JSON.stringify(loginData),
+        credentials: 'include',
       });
 
       const data = await response.json();
@@ -40,18 +45,7 @@ export default function TestLogin() {
         description: "Welcome back, " + data.user.firstName,
       });
       
-      // Store authentication in localStorage as a simple solution
-      localStorage.setItem('adminAuth', JSON.stringify({
-        user: data.user,
-        token: data.token,
-        timestamp: Date.now()
-      }));
-      
-      // Also store the token separately for API requests
-      localStorage.setItem('admin-token', data.token);
-      
       // Force refresh authentication state
-      queryClient.invalidateQueries({ queryKey: ['/api/test-auth/user'] });
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
       
       // Small delay to ensure queries are refreshed, then redirect to home
@@ -83,7 +77,13 @@ export default function TestLogin() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <SEO title="Admin Login" url="https://www.techinterviewnotes.com/login" />
+      <SEO
+        title="Admin Login"
+        description="Admin login portal for DevInterview Pro."
+        url={buildSiteUrl('/admin-login')}
+        image={DEFAULT_IMAGE_URL}
+        type="website"
+      />
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Admin Login</CardTitle>

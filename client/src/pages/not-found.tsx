@@ -1,11 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
 import { SEO } from '@/components/SEO';
+import { DEFAULT_IMAGE_URL, buildSiteUrl } from '@/lib/site';
 
 export default function NotFound() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <SEO title="404 - Page Not Found" url="https://www.techinterviewnotes.com/404" />
+      <SEO
+        title="404 - Page Not Found"
+        description="The page you are looking for could not be found."
+        url={buildSiteUrl('/404')}
+        image={DEFAULT_IMAGE_URL}
+        type="website"
+      />
       <Card className="w-full max-w-md mx-4">
         <CardContent className="pt-6">
           <div className="flex mb-4 gap-2">

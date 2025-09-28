@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { getCsrfToken } from "./csrf";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -13,17 +14,9 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
-  
-  // Check for user auth token first
-  const authToken = localStorage.getItem('authToken');
-  if (authToken) {
-    headers['Authorization'] = `Bearer ${authToken}`;
-  } else {
-    // Fallback to admin token if no user token
-    const adminToken = localStorage.getItem('admin-token');
-    if (adminToken) {
-      headers['Authorization'] = adminToken;
-    }
+  const csrfToken = getCsrfToken();
+  if (csrfToken) {
+    headers["X-CSRF-Token"] = csrfToken;
   }
 
   const res = await fetch(url, {
@@ -43,23 +36,10 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const headers: Record<string, string> = {};
-    
-    // Check for user auth token first
-    const authToken = localStorage.getItem('authToken');
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`;
-    } else {
-      // Fallback to admin token if no user token
-      const adminToken = localStorage.getItem('admin-token');
-      if (adminToken) {
-        headers['Authorization'] = adminToken;
-      }
-    }
-
+    const csrfToken = getCsrfToken();
     const res = await fetch(queryKey[0] as string, {
       credentials: "include",
-      headers,
+      headers: csrfToken ? { "X-CSRF-Token": csrfToken } : undefined,
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

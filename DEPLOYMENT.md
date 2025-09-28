@@ -11,9 +11,16 @@
    - Configure these environment variables:
      ```
      DATABASE_URL=your_postgres_url
+     DATABASE_CLIENT=neon # required when using Neon serverless Postgres
+     SESSION_DB_URL=optional_separate_session_store
      SESSION_SECRET=generate_random_32_char_string
-     STRIPE_SECRET_KEY=sk_live_your_stripe_key
-     VITE_STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_your_stripe_key
+     JWT_SECRET=your_jwt_secret
+     RAZORPAY_KEY_ID=rzp_live_your_key_id
+     RAZORPAY_KEY_SECRET=your_razorpay_secret
+     RAZORPAY_WEBHOOK_SECRET=your_webhook_secret_if_used
+     SITE_URL=https://your-production-domain
+     BASE_URL=https://your-production-domain
+     VERBOSE_LOGGING=false
      ```
 3. **Deploy** - Vercel auto-deploys from the `vercel.json` configuration
 
@@ -22,7 +29,7 @@
 1. **Go to https://railway.app**
 2. **Create new project** → Import from GitHub
 3. **Add PostgreSQL service** → Copy DATABASE_URL
-4. **Set environment variables** in Railway dashboard
+4. **Set environment variables** in Railway dashboard (DATABASE_URL, SESSION_SECRET, JWT_SECRET, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
 5. **Deploy** - Railway auto-deploys on git push
 
 ### Option 3: Netlify (Frontend) + Railway (Backend)
@@ -39,6 +46,8 @@
 ### Neon (Recommended - Free Tier)
 - Go to https://neon.tech
 - Create database → Copy connection string
+- If deploying with Node.js and Drizzle, remove `channel_binding=require` from the connection string—the `pg` client used by
+  Drizzle doesn't support channel binding.
 - Free: 0.5GB storage, 100 hours compute
 
 ### Supabase (Alternative)
@@ -56,14 +65,22 @@
 # Essential for Production
 DATABASE_URL=postgresql://user:pass@host:port/db
 SESSION_SECRET=your_32_character_secret_key
+JWT_SECRET=your_jwt_secret
 NODE_ENV=production
 
-# Payment Processing (Get from Stripe Dashboard)
-STRIPE_SECRET_KEY=sk_live_your_actual_stripe_secret
-VITE_STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_your_actual_publishable_key
+# Payment Processing (Razorpay)
+RAZORPAY_KEY_ID=rzp_live_your_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_secret
 
 # Optional
-USE_SIMPLE_ROUTES=false
+DATABASE_CLIENT=neon
+SESSION_DB_URL=postgresql://session_user:password@host:5432/session_db
+RAZORPAY_WEBHOOK_SECRET=your_webhook_secret_if_used
+SITE_URL=https://your-production-domain
+BASE_URL=https://your-production-domain
+VERBOSE_LOGGING=false
+
+> ℹ️ Set `DATABASE_CLIENT=neon` only when deploying to Neon serverless Postgres. For Supabase, Railway, or other traditional Postgres providers, omit this override so the standard `pg` client is used.
 ```
 
 ## Post-Deployment Checklist
@@ -74,7 +91,7 @@ USE_SIMPLE_ROUTES=false
    UPDATE users SET role = 'admin' WHERE email = 'your-email@domain.com';
    ```
 
-2. **Test Payment**: Make a small test purchase to verify Stripe integration
+2. **Test Payment**: Make a small test purchase to verify Razorpay integration
 
 3. **Domain Setup**: Add your custom domain in the hosting platform dashboard
 
@@ -84,7 +101,7 @@ USE_SIMPLE_ROUTES=false
 
 ## Troubleshooting
 
-- **Payment not working**: Verify Stripe keys are live keys (not test)
+- **Payment not working**: Verify Razorpay keys are live keys (not test)
 - **Database connection error**: Check DATABASE_URL format and credentials
 - **Build fails**: Ensure all dependencies are in package.json
 - **Admin access denied**: Verify user role is set to 'admin' in database

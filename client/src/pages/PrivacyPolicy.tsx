@@ -1,10 +1,17 @@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SEO } from '@/components/SEO';
+import { DEFAULT_IMAGE_URL, buildSiteUrl } from '@/lib/site';
 
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-900 py-8">
-      <SEO title="Privacy Policy" url="https://www.techinterviewnotes.com/privacy" />
+      <SEO
+        title="Privacy Policy"
+        description="Learn how DevInterview Pro collects and uses your data."
+        url={buildSiteUrl('/privacy')}
+        image={DEFAULT_IMAGE_URL}
+        type="article"
+      />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-8">
           <h1 className="text-4xl font-bold mb-8 text-gray-900 dark:text-white">

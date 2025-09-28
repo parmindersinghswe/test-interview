@@ -9,6 +9,7 @@ import { useUserAuth } from "@/hooks/useUserAuth";
 import { useLocation } from "wouter";
 import { Eye, EyeOff, User, Mail, Lock } from "lucide-react";
 import { SEO } from '@/components/SEO';
+import { DEFAULT_IMAGE_URL, buildSiteUrl } from '@/lib/site';
 
 interface AuthResponse {
   user: {
@@ -22,11 +23,42 @@ interface AuthResponse {
 }
 
 export default function Auth() {
-  const [, setLocation] = useLocation();
+  const [currentLocation, setLocation] = useLocation();
   const { toast } = useToast();
   const { user, isAuthenticated, loginMutation, registerMutation } = useUserAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<"login" | "register">(() => {
+    const pathname =
+      typeof window !== "undefined" ? window.location.pathname : currentLocation;
+
+    return pathname === "/register" ? "register" : "login";
+  });
+
+  useEffect(() => {
+    const pathname =
+      typeof window !== "undefined" ? window.location.pathname : currentLocation;
+
+    setActiveTab(pathname === "/register" ? "register" : "login");
+  }, [currentLocation]);
+
+  const handleTabChange = (value: string) => {
+    const nextTab = value === "register" ? "register" : "login";
+
+    setActiveTab(nextTab);
+
+    const pathname =
+      typeof window !== "undefined" ? window.location.pathname : currentLocation;
+
+    if (nextTab === "register" && pathname !== "/register") {
+      setLocation("/register");
+    }
+
+    if (nextTab === "login" && pathname !== "/login") {
+      setLocation("/login");
+    }
+  };
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -37,8 +69,8 @@ export default function Auth() {
 
   // Login form state
   const [loginData, setLoginData] = useState({
-    email: "parmindersingh.swe@gmail.com",
-    password: "Test@123.",
+    email: "",
+    password: "",
   });
 
   // Registration form state
@@ -85,11 +117,17 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      <SEO title="Account" url="https://www.techinterviewnotes.com/auth" />
+      <SEO
+        title="Account"
+        description="Sign in or create your DevInterview Pro account."
+        url={buildSiteUrl(activeTab === "register" ? "/register" : "/login")}
+        image={DEFAULT_IMAGE_URL}
+        type="website"
+      />
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
         {/* Left side - Auth Forms */}
         <div className="w-full max-w-md mx-auto">
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="register">Register</TabsTrigger>

@@ -7,7 +7,7 @@
 - **Backend**: Node.js, Express.js, TypeScript
 - **Database**: PostgreSQL with Drizzle ORM
 - **File Storage**: Local disk storage (`/uploads` directory)
-- **Payment Processing**: Stripe (Cards, UPI, Net Banking)
+- **Payment Processing**: Razorpay (Cards, UPI, Net Banking)
 - **Authentication**: Email/Password with JWT tokens + Admin session management
 - **UI Components**: shadcn/ui, Radix UI, Lucide React icons
 
@@ -29,35 +29,45 @@ sessions           -- Session storage (PostgreSQL store)
 ```env
 # Database Connection
 DATABASE_URL=postgresql://username:password@host:port/database
+# Optional: use 'neon' to enable the Neon serverless driver
+DATABASE_CLIENT=pg
 
 # Authentication & Security
 SESSION_SECRET=your_32_character_random_secret_key
 NODE_ENV=production
 
-# Payment Processing (Stripe)
-STRIPE_SECRET_KEY=sk_live_your_stripe_secret_key
-VITE_STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_your_stripe_publishable_key
+# Payment Processing (Razorpay)
+RAZORPAY_KEY_ID=rzp_live_your_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_secret
+RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret
 
 # Application Mode
-USE_SIMPLE_ROUTES=false
+VERBOSE_LOGGING=false
 ```
 
 ### **Development Environment**
 ```env
 # Development Database
 DATABASE_URL=postgresql://localhost:5432/devinterview_dev
+# Optional: use 'neon' to enable the Neon serverless driver
+DATABASE_CLIENT=pg
 
 # Development Settings
 NODE_ENV=development
 SESSION_SECRET=dev_secret_minimum_32_characters_long
 
-# Stripe Test Keys
-STRIPE_SECRET_KEY=sk_test_your_test_secret_key
-VITE_STRIPE_PUBLISHABLE_KEY_TEST=pk_test_your_test_publishable_key
+# Razorpay Test Keys
+RAZORPAY_KEY_ID=rzp_test_your_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_secret
+RAZORPAY_WEBHOOK_SECRET=your_test_webhook_secret
 
-# Route Configuration
-USE_SIMPLE_ROUTES=false
+# Logging
+VERBOSE_LOGGING=true
 ```
+
+> **Obtaining Razorpay credentials**
+> - Generate API keys from **Settings → API Keys** in the Razorpay Dashboard for both Test and Live modes.
+> - Create a webhook in **Settings → Webhooks** and define the secret you will store as `RAZORPAY_WEBHOOK_SECRET`.
 
 ### **Admin Account Setup**
 ```env
@@ -86,8 +96,8 @@ uploads/
 
 ## 💳 Payment System Configuration
 
-### **Stripe Integration**
-- **Supported Methods**: 
+### **Razorpay Integration**
+- **Supported Methods**:
   - Credit/Debit Cards (Visa, Mastercard, RuPay)
   - UPI (PhonePe, Google Pay, Paytm, BHIM)
   - Net Banking (All major Indian banks)
@@ -95,16 +105,15 @@ uploads/
 
 ### **Payment Flow**
 1. User adds materials to cart
-2. Checkout creates Stripe Payment Intent
-3. Client-side Stripe handles payment collection
-4. Server verifies payment and creates purchase record
+2. Checkout creates Razorpay order
+3. Client-side Razorpay checkout collects payment
+4. Server verifies payment signature and records purchase
 5. User gets download access to purchased materials
 
-### **Required Stripe Setup**
-1. Create Stripe account at https://stripe.com
-2. Enable Indian payment methods in Stripe Dashboard
-3. Configure webhooks (optional for advanced features)
-4. Get API keys from Dashboard → Developers → API keys
+### **Required Razorpay Setup**
+1. Create Razorpay account at https://razorpay.com
+2. Generate API keys from Razorpay dashboard
+3. Configure webhooks (optional)
 
 ## 🔒 Authentication System
 
@@ -195,7 +204,7 @@ uploads/
 ### **Prerequisites**
 - Node.js 18+ or 20+
 - PostgreSQL database
-- Stripe account (for payments)
+- Razorpay account (for payments)
 
 ### **Quick Start**
 ```bash
@@ -219,6 +228,10 @@ npm run db:generate
 # Access database studio
 npm run db:studio
 ```
+
+### **Linting & Code Style**
+- Run `npm run lint` before committing changes.
+- Inside the `server/` directory, local imports must include the correct file extension (`.js`, `.ts`, or `.tsx`); ESLint will flag missing or incorrect extensions.
 
 ## 🛡️ Security Configuration
 
@@ -264,9 +277,9 @@ npm run db:studio
 ## ⚠️ Common Issues & Solutions
 
 ### **Payment Not Working**
-- Verify Stripe keys are LIVE keys (sk_live_, pk_live_)
-- Check Stripe webhook configuration
-- Ensure Indian payment methods are enabled
+- Verify Razorpay keys match the correct mode (Test vs Live)
+- Confirm Razorpay webhook configuration and `RAZORPAY_WEBHOOK_SECRET`
+- Ensure required payment methods are enabled in the Razorpay Dashboard
 
 ### **Database Connection Errors**
 - Verify DATABASE_URL format and credentials
@@ -289,7 +302,7 @@ npm run db:studio
 - Database backup schedule
 - Log rotation and cleanup
 - Security updates for dependencies
-- Stripe webhook endpoint monitoring
+- Razorpay webhook endpoint monitoring
 - File storage cleanup for unused uploads
 
 ### **Scaling Considerations**

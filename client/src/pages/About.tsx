@@ -8,6 +8,8 @@ export default function About() {
         title="About DevInterview Pro"
         description="Learn about DevInterview Pro's mission to help developers succeed in technical interviews with real questions and expert guidance."
         url="https://devinterview.pro/about"
+        image="https://devinterview.pro/generated-icon.png"
+        type="website"
       />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* SEO-Optimized Header */}

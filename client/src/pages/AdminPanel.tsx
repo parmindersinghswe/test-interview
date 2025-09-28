@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { SEO } from '@/components/SEO';
+import { DEFAULT_IMAGE_URL, buildSiteUrl } from '@/lib/site';
 import { apiRequest } from '@/lib/queryClient';
+import { getCsrfToken } from '@/lib/csrf';
 import { Upload, Trash2, Eye, EyeOff, FileText, RefreshCw } from 'lucide-react';
 import type { Upload as UploadType, Purchase, Material, User } from '@shared/schema';
 
@@ -54,23 +56,11 @@ export default function AdminPanel() {
   });
 
   // Get all purchases for admin tracking
-  const { data: purchases = [], isLoading: isLoadingPurchases, refetch: refetchPurchases } = useQuery({
+  const { data: purchases = [], isLoading: isLoadingPurchases, refetch: refetchPurchases } = useQuery<(Purchase & { material: Material, user: User | null })[]>({
     queryKey: ['/api/admin/purchases'],
     enabled: adminCheck?.isAdmin === true,
-    staleTime: 0, // Always fetch fresh data
-    queryFn: async () => {
-      const token = localStorage.getItem('admin-token');
-      const response = await fetch('/api/admin/purchases', {
-        headers: {
-          'Authorization': token || '',
-        },
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch purchases');
-      }
-      return response.json();
-    },
-  }) as { data: (Purchase & { material: Material, user: User | null })[], isLoading: boolean, refetch: () => void };
+    staleTime: 0,
+  });
   const filteredUploads = useMemo(
     () =>
       !selectedTechnology
@@ -90,12 +80,12 @@ export default function AdminPanel() {
       formData.append('price', price);
       formData.append('pageCount', pageCount);
 
+      const csrfToken = getCsrfToken();
       const response = await fetch('/api/admin/upload', {
         method: 'POST',
-        headers: {
-          'Authorization': localStorage.getItem('admin-token') || '',
-        },
         body: formData,
+        credentials: 'include',
+        headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : undefined,
       });
 
       if (!response.ok) {
@@ -191,7 +181,6 @@ export default function AdminPanel() {
   const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (/^\d*\.?\d*$/.test(value)) {
-      debugger;
       setPrice(value);
     }
   };
@@ -220,7 +209,13 @@ export default function AdminPanel() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <SEO title="Admin Panel" url="https://www.techinterviewnotes.com/admin" />
+      <SEO
+        title="Admin Panel"
+        description="Administrative tools for managing DevInterview Pro content."
+        url={buildSiteUrl('/admin')}
+        image={DEFAULT_IMAGE_URL}
+        type="website"
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Admin Panel</h1>

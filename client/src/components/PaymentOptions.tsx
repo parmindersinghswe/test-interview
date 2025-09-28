@@ -38,7 +38,6 @@
 //         headers: { 'Content-Type': 'application/json' },
 //         body: JSON.stringify({ amount: total })
 //       });
-// debugger;
 //       const result = await res.json();
 //       const order = result;
 //       if (!order) throw new Error('Failed to create order');

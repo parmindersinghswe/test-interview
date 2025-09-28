@@ -1,8 +1,8 @@
-import { useParams, Link } from 'wouter';
+import { useParams, Link, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { useLanguage } from '@/components/LanguageProvider';
+import { useLanguage } from '@shared/LanguageProvider';
 import { isUnauthorizedError } from '@/lib/authUtils';
 import { apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,7 @@ import {
   Users
 } from 'lucide-react';
 import { SEO } from '@/components/SEO';
+import { DEFAULT_IMAGE_URL, buildSiteUrl } from '@/lib/site';
 import { useState } from 'react';
 
 export default function MaterialDetails() {
@@ -32,6 +33,7 @@ export default function MaterialDetails() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
 
@@ -75,7 +77,7 @@ export default function MaterialDetails() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          navigate('/login');
         }, 500);
         return;
       }
@@ -111,7 +113,7 @@ export default function MaterialDetails() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          navigate('/login');
         }, 500);
         return;
       }
@@ -176,18 +178,41 @@ export default function MaterialDetails() {
     }
   };
 
-  const averageRating = reviews.length > 0 
-    ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length 
+  const averageRating = reviews.length > 0
+    ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
     : parseFloat(material.rating);
 
   const userHasReviewed = reviews.some(review => review.userId === user?.id);
+
+  const productSchema = material ? {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: material.title,
+    description: material.description,
+    image: material.imageUrl ?? DEFAULT_IMAGE_URL,
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: Number(material.rating),
+      reviewCount: material.reviewCount,
+    },
+    offers: {
+      '@type': 'Offer',
+      price: Number(material.price),
+      priceCurrency: 'INR',
+      availability: 'https://schema.org/InStock',
+      url: buildSiteUrl(`/materials/${id}`),
+    },
+  } : undefined;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-900 py-8">
       <SEO
         title={material ? material.title : 'Material Details'}
         description={material ? material.description : undefined}
-        url={`https://www.techinterviewnotes.com/materials/${id}`}
+        url={buildSiteUrl(`/materials/${id}`)}
+        image={material?.imageUrl ?? DEFAULT_IMAGE_URL}
+        type="article"
+        schema={productSchema}
       />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back Button */}
@@ -242,6 +267,7 @@ export default function MaterialDetails() {
                   src={material.imageUrl || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=400'}
                   alt={material.title}
                   className="w-full h-64 object-cover rounded-lg mb-6"
+                  loading="lazy"
                 />
 
                 {/* Description */}
@@ -346,6 +372,7 @@ export default function MaterialDetails() {
                           src={review.user.profileImageUrl || '/default-avatar.png'}
                           alt={review.user.firstName || 'User'}
                           className="w-10 h-10 rounded-full object-cover"
+                          loading="lazy"
                         />
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
@@ -435,12 +462,12 @@ export default function MaterialDetails() {
                       </Link>
                     </div>
                   ) : (
-                    <a href="/api/login">
+                    <Link href="/login">
                       <Button className="w-full bg-blue-600 hover:bg-blue-700">
                         <ShoppingCart className="h-4 w-4 mr-2" />
                         Login to Purchase
                       </Button>
-                    </a>
+                    </Link>
                   )}
                 </div>
 

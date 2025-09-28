@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Phone, MapPin, Send } from 'lucide-react';
 import { SEO } from '@/components/SEO';
+import { DEFAULT_IMAGE_URL, buildSiteUrl } from '@/lib/site';
 
 export default function Contact() {
   const { toast } = useToast();
@@ -43,7 +44,9 @@ export default function Contact() {
       <SEO
         title="Contact DevInterview Pro"
         description="Get in touch with our team for support and inquiries."
-        url="https://www.techinterviewnotes.com/contact"
+        url={buildSiteUrl('/contact')}
+        image={DEFAULT_IMAGE_URL}
+        type="website"
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* SEO-Optimized Header */}

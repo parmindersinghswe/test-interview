@@ -1,4 +1,4 @@
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,7 @@ export default function Cart() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -32,12 +33,12 @@ export default function Cart() {
         description: "You are logged out. Logging in again...",
         variant: "destructive",
       });
-      setTimeout(() => {
-        window.location.href = "/api/login";
+      const timeout = setTimeout(() => {
+        navigate('/login');
       }, 500);
-      return;
+      return () => clearTimeout(timeout);
     }
-  }, [isAuthenticated, isLoading, toast]);
+  }, [isAuthenticated, isLoading, toast, navigate]);
 
   const { data: cartItems = [], isLoading: isCartLoading } = useQuery<(CartItem & { material: Material })[]>({
     queryKey: ['/api/cart'],
@@ -63,7 +64,7 @@ export default function Cart() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          navigate('/login');
         }, 500);
         return;
       }
@@ -140,6 +141,7 @@ export default function Cart() {
                         src={item.material.imageUrl || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=200'}
                         alt={item.material.title}
                         className="w-24 h-24 object-cover rounded-lg"
+                        loading="lazy"
                       />
                       <div className="flex-1">
                         <div className="flex items-start justify-between">

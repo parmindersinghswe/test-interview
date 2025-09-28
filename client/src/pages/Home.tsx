@@ -7,6 +7,7 @@ import type { Material } from '@shared/schema';
 import { Link } from 'wouter';
 import { CheckCircle2, Download, Star, Code, Settings } from 'lucide-react';
 import { SEO } from '@/components/SEO';
+import { DEFAULT_IMAGE_URL, SITE_URL } from '@/lib/site';
 import { useEffect, useState } from 'react';
 
 const technologies = [
@@ -32,7 +33,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 text-white">
-      <SEO title="Dashboard" url="https://www.techinterviewnotes.com" />
+      <SEO
+        title="Dashboard"
+        description="Access your dashboard and explore interview materials on DevInterview Pro."
+        url={SITE_URL}
+        image={DEFAULT_IMAGE_URL}
+        type="website"
+      />
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-black/20"></div>

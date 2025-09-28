@@ -161,6 +161,8 @@ export default function Landing() {
         title="Master Your Tech Interview"
         description="Get instant access to 1000+ real interview questions from Microsoft, Google, Amazon, Meta, Apple, Netflix, OpenAI, and Spotify. Expert solutions, code examples, and insider tips for .NET, React, Java, Python, Swift, Node.js, ML/AI, and Flutter developers."
         url="https://devinterview.pro"
+        image="https://devinterview.pro/generated-icon.png"
+        type="website"
       />
 
       {/* Hero Section with Animated Question Preview */}

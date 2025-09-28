@@ -174,3 +174,23 @@ export function getLanguageName(code: Language): string {
   const lang = supportedLanguages.find(l => l.code === code);
   return lang ? lang.nativeName : code;
 }
+
+export const httpStatusMessages = {
+  401: {
+    en: 'Invalid email or password.',
+    hi: 'अमान्य ईमेल या पासवर्ड।',
+  },
+  409: {
+    en: 'An account with this email already exists.',
+    hi: 'इस ईमेल के साथ एक खाता पहले से मौजूद है।',
+  },
+  500: {
+    en: 'Server unavailable. Please try again later.',
+    hi: 'सर्वर उपलब्ध नहीं है। कृपया बाद में पुनः प्रयास करें।',
+  },
+} as const;
+
+export function getHttpStatusMessage(status: number, language: Language = 'en'): string | undefined {
+  return httpStatusMessages[status as keyof typeof httpStatusMessages]?.[language]
+    || httpStatusMessages[status as keyof typeof httpStatusMessages]?.en;
+}

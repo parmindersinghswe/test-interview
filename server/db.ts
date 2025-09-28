@@ -1,26 +1,58 @@
-import pkg from 'pg';
-const { Pool } = pkg;
+import { Pool as NeonPool, neonConfig } from "@neondatabase/serverless";
+import { drizzle as neonDrizzle } from "drizzle-orm/neon-serverless";
+import { drizzle as pgDrizzle } from "drizzle-orm/node-postgres";
+import { Pool as PgPool } from "pg";
+import ws from "ws";
+import * as schema from "../shared/schema.js";
+import { describeConnectionStringForLogs, env } from "./config.js";
+import logger from "./logger.js";
 
-import { drizzle } from 'drizzle-orm/node-postgres';
-import * as schema from '@shared/schema';
-import * as dotenv from 'dotenv';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+const createNeonConnection = () => {
+  neonConfig.webSocketConstructor = ws;
 
-// ESM workaround for __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+  const logContext = {
+    databaseClient: env.DATABASE_CLIENT,
+    databaseUrl: describeConnectionStringForLogs(env.DATABASE_URL),
+  } as const;
 
-// Load environment variables from .env.local
-dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+  try {
+    const pool = new NeonPool({ connectionString: env.DATABASE_URL });
 
-// Ensure DATABASE_URL is set
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
-}
+    logger.info(logContext, "Created Neon connection pool");
 
-// Create and export PostgreSQL connection pool
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    return {
+      pool,
+      db: neonDrizzle({ client: pool, schema }),
+    } as const;
+  } catch (error) {
+    logger.error({ ...logContext, error }, "Failed to create Neon connection pool");
+    throw error;
+  }
+};
 
-// Initialize and export Drizzle client
-export const db = drizzle(pool, { schema });
+const createPgConnection = () => {
+  const logContext = {
+    databaseClient: env.DATABASE_CLIENT,
+    databaseUrl: describeConnectionStringForLogs(env.DATABASE_URL),
+  } as const;
+
+  try {
+    const pool = new PgPool({ connectionString: env.DATABASE_URL });
+
+    logger.info(logContext, "Created Postgres connection pool");
+
+    return {
+      pool,
+      db: pgDrizzle(pool, { schema }),
+    } as const;
+  } catch (error) {
+    logger.error({ ...logContext, error }, "Failed to create Postgres connection pool");
+    throw error;
+  }
+};
+
+const connection =
+  env.DATABASE_CLIENT === "neon" ? createNeonConnection() : createPgConnection();
+
+export const pool = connection.pool;
+export const db = connection.db;

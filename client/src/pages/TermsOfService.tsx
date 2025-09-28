@@ -1,12 +1,16 @@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SEO } from '@/components/SEO';
+import { DEFAULT_IMAGE_URL, buildSiteUrl } from '@/lib/site';
 
 export default function TermsOfService() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-900 py-8">
       <SEO
         title="Terms of Service"
-        url="https://www.techinterviewnotes.com/terms"
+        description="Review DevInterview Pro's terms and conditions."
+        url={buildSiteUrl('/terms')}
+        image={DEFAULT_IMAGE_URL}
+        type="article"
       />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-8">

@@ -1,33 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 
+interface User {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  isAdmin: boolean;
+}
+
 export function useAuth() {
-  // Check localStorage for admin auth first
-  const localAuth = localStorage.getItem('adminAuth');
-  let localUser = null;
-  
-  if (localAuth) {
-    try {
-      const authData = JSON.parse(localAuth);
-      // Check if auth is still valid (24 hours)
-      if (authData.timestamp && (Date.now() - authData.timestamp) < 24 * 60 * 60 * 1000) {
-        localUser = authData.user;
-      } else {
-        localStorage.removeItem('adminAuth');
-      }
-    } catch (error) {
-      localStorage.removeItem('adminAuth');
-    }
-  }
-
-  // Only query server if no local user
-  const { data: regularUser, isLoading: regularLoading } = useQuery({
+  const { data: user, isLoading } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/user", { credentials: "include" });
+      if (res.status === 401) {
+        return null;
+      }
+      if (!res.ok) {
+        throw new Error("Failed to fetch user");
+      }
+      return await res.json();
+    },
     retry: false,
-    enabled: !localUser,
   });
-
-  const user = localUser || regularUser;
-  const isLoading = !localUser && regularLoading;
 
   return {
     user,

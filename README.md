@@ -31,6 +31,31 @@ A comprehensive interview preparation platform featuring curated interview mater
 - User management
 - Payment transaction monitoring
 
+## SEO Component & Structured Data
+
+Use the `SEO` component to manage meta tags and inject JSON-LD structured data for richer search results. Pass a `schema` object when you need to describe a page as a Product or Article.
+
+```tsx
+import { SEO } from '@/components/SEO';
+
+<SEO
+  title="Material Title"
+  description="Brief description"
+  schema={{
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: "Material Title",
+    offers: {
+      "@type": "Offer",
+      price: 99,
+      priceCurrency: "INR"
+    }
+  }}
+/>
+```
+
+Pages such as `MaterialDetails` use this capability to expose product-level schema to search engines.
+
 ## Technology Stack
 
 ### Frontend
@@ -40,7 +65,7 @@ A comprehensive interview preparation platform featuring curated interview mater
 - **shadcn/ui** component library
 - **TanStack Query** for data fetching
 - **Wouter** for routing
-- **Stripe React** for payment processing
+- **Razorpay Checkout** for payment processing
 
 ### Backend
 - **Express.js** with TypeScript
@@ -48,15 +73,24 @@ A comprehensive interview preparation platform featuring curated interview mater
 - **Drizzle ORM** for database operations
 - **Express Session** for authentication
 - **Multer** for file uploads
-- **Stripe** for payment processing
+- **Razorpay Node SDK** for payment processing
 - **jsPDF** for PDF generation
 
 ## Installation & Setup
 
 ### Prerequisites
-- Node.js 18+ 
+- Node.js 18+
 - PostgreSQL database
-- Stripe account (for payments)
+- Razorpay account with API credentials (for payments)
+
+> **Note:** The host machine must have a CA bundle installed. Without it, Node.js network requests may fail with `ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY`.
+>
+> ```bash
+> sudo apt-get install -y ca-certificates && sudo update-ca-certificates  # Debian/Ubuntu
+> apk add --no-cache ca-certificates                                     # Alpine
+> ```
+>
+> For custom or corporate certificate chains, set the `NODE_EXTRA_CA_CERTS` environment variable to the path of your CA bundle.
 
 ### Environment Variables
 
@@ -74,15 +108,10 @@ PGDATABASE=your_database_name
 # Session Configuration
 SESSION_SECRET=your_session_secret_key_here
 
-# Stripe Payment Configuration (Required for payments)
-STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
-VITE_STRIPE_PUBLISHABLE_KEY_TEST=pk_test_your_stripe_publishable_key
-VITE_STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_your_stripe_live_key
-
-# Optional legacy Stripe variables
-STRIPE_TEST_SECRET_KEY=sk_test_your_test_secret_key
-STRIPE_LIVE_SECRET_KEY=sk_live_your_live_secret_key
-STRIPE_API_VERSION=2024-03-15
+# Razorpay Payment Configuration (Required for payments)
+RAZORPAY_KEY_ID=your_razorpay_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret
 
 # Admin login for simple routes
 ADMIN_USERNAME=admin
@@ -95,8 +124,115 @@ ISSUER_URL=https://replit.com/oidc
 
 # Application Configuration
 NODE_ENV=development
-USE_SIMPLE_ROUTES=true
+VERBOSE_LOGGING=true
 ```
+
+> **Where to find Razorpay credentials:**
+> - **Key ID & Key Secret**: Log in to the [Razorpay Dashboard](https://dashboard.razorpay.com/) and go to **Settings → API Keys**. Create a new key pair to download the Key ID and Secret for either the Test or Live mode.
+> - **Webhook Secret**: Navigate to **Settings → Webhooks** in the Razorpay Dashboard. When adding your webhook endpoint, define a secret and reuse it as `RAZORPAY_WEBHOOK_SECRET` in your environment variables.
+
+### Database migrations
+
+Apply schema changes with `npm run db:push`. This command is **not** part of `npm run dev`, so remember to run it whenever the Drizzle migrations change:
+
+- **Local development** – Run `npm run db:push` after installing dependencies and any time you edit the files under `migrations/`.
+- **Docker / Docker Compose** – Execute `docker compose run --rm app npm run db:push` so the application container updates the PostgreSQL instance before starting normally.
+- **Production deploys** – Vercel executes `npm run vercel:migrate` (see `scripts/vercel-migrate.mjs`) immediately after the build, which in turn runs `npm run db:push`. For other platforms, add an explicit manual step or a CI/CD job that runs `npm run db:push` against the production database.
+
+### Run with Docker
+
+#### Prerequisites
+- [Docker Engine](https://docs.docker.com/engine/install/) with BuildKit support
+- [Docker Compose v2](https://docs.docker.com/compose/install/) (included with recent Docker Desktop/CLI releases)
+
+#### Build the application image
+From the repository root, build the combined Express/Vite server image. The command below assumes you are using the root `Dockerfile`; adjust the `-f` flag if you keep the Dockerfile elsewhere.
+
+```bash
+docker build -t devinterview-pro-app .
+```
+
+The resulting `devinterview-pro-app` image bundles both the API (Express) and the Vite build so the same container can serve the full stack.
+
+#### Start the stack with Docker Compose
+A typical `docker-compose.yml` pairs the application container with PostgreSQL:
+
+```yaml
+services:
+  app:
+    image: devinterview-pro-app
+    env_file:
+      - .env.docker
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+  postgres:
+    image: postgres:16
+    env_file:
+      - .env.postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
+```
+
+Copy `.env.example` to `.env` for local development, and create Docker-specific environment files referenced by Compose (for example, `.env.docker` and `.env.postgres`). Secrets should live in these files rather than being baked into images. When you need to override a value temporarily, set it with `docker compose run -e NAME=value ...` instead of editing the file.
+
+Bring up the containers once the Compose file exists:
+
+```bash
+docker compose up -d
+```
+
+Before the first run, apply the database schema inside the application container so that PostgreSQL has all required tables:
+
+```bash
+docker compose run --rm app npm run db:push
+```
+
+After migrations succeed, restart the application container to ensure it picks up the schema:
+
+```bash
+docker compose restart app
+```
+
+Shut the stack down at any time with `docker compose down`, and add `-v` if you want to remove the PostgreSQL volume as well.
+
+### Vercel Deployment
+
+When deploying with Vercel, keep the Build Command set to `npm run build && npm run vercel:migrate` so migrations run automatically via `scripts/vercel-migrate.mjs` (which calls `npm run db:push`)—this matches the configuration in `vercel.json`. Configure your environment variables in the Vercel dashboard, and when production uses a Neon database be sure to set `DATABASE_CLIENT=neon` alongside `DATABASE_URL`. Review [DEPLOYMENT.md](DEPLOYMENT.md) for the complete deployment checklist.
+
+### Azure Deployment (App Service or Container Apps)
+
+1. **Provision infrastructure**
+   - Create an [Azure Database for PostgreSQL flexible server](https://learn.microsoft.com/azure/postgresql/flexible-server) in the same region as the application. Enable public access or configure a private endpoint and firewall rules for outbound connectivity from the app.
+   - For *App Service*: create a Linux App Service Plan and a Web App running Node.js 18+. For *Container Apps*: provision a Container Apps environment and an app that uses the repository Dockerfile. Attach a custom domain through Azure Front Door or App Service custom domains, and enable managed HTTPS certificates.
+2. **Configure secrets and environment variables**
+   - In App Service, use **Settings → Configuration** to add all variables from the `.env` example (`DATABASE_URL`, Razorpay keys, session secret, etc.). In Container Apps, mirror the same settings under **Application** and **Secret** values. Consider linking an Azure Key Vault for centralized secret storage.
+   - Update `DATABASE_URL` to point to the Azure Database for PostgreSQL connection string and enforce SSL mode (`?sslmode=require`).
+3. **Build and start commands**
+   - For App Service with the built-in Node handler, set the build command to `npm install && npm run build` and the startup command to `npm run start`. Container Apps deployments should run the existing Dockerfile or use the same commands in a custom start script.
+4. **Run database migrations**
+   - Use Azure Cloud Shell or `az webapp ssh`/`az containerapp exec` to open a shell inside the running container and execute `npm run db:push` so the Azure Database instance has the latest schema. Alternatively, run the command from your CI/CD pipeline after deploying.
+
+> **Networking notes:** If you restrict outbound networking, grant the app access to the PostgreSQL server through VNet integration or delegated subnets. Bind a custom domain and enforce HTTPS via App Service managed certificates, Azure Front Door, or Azure CDN.
+
+### AWS Deployment (Elastic Beanstalk or ECS)
+
+1. **Provision infrastructure**
+   - Launch an Amazon RDS for PostgreSQL instance (or Aurora PostgreSQL) in a private subnet with public or VPN access that matches your deployment model. Enable automatic backups and enforce IAM or password authentication as required.
+   - For *Elastic Beanstalk*: create a Node.js 18+ web server environment (single or load-balanced). For *Amazon ECS*: create a cluster (Fargate or EC2) and a service that runs the container built from the repository Dockerfile behind an Application Load Balancer. Configure Route 53 for custom domains and attach AWS Certificate Manager (ACM) certificates for HTTPS.
+2. **Configure secrets and environment variables**
+   - In Elastic Beanstalk, add environment properties under **Configuration → Software**; for ECS, use task definition environment variables or inject secrets from AWS Secrets Manager/SSM Parameter Store. Include all variables from `.env` and set the `DATABASE_URL` to the RDS connection string with `sslmode=require`.
+   - Ensure security groups allow the application tasks or instances to reach the RDS endpoint on port 5432.
+3. **Build and start commands**
+   - Elastic Beanstalk’s Node.js platform runs `npm install` automatically; add a `container_commands` section in `.ebextensions` or a build step in your CI/CD pipeline that calls `npm run build`. Set the Node command to `npm run start`. ECS task definitions should run `npm run start` after the image executes `npm install && npm run build` during the image build stage.
+4. **Run database migrations**
+   - After the environment is healthy, connect via `eb ssh` or use AWS Systems Manager Session Manager (for ECS) to open a shell in the application container and run `npm run db:push`. You can also schedule this step in your deployment pipeline (e.g., CodeBuild, GitHub Actions) with network access to the RDS instance.
+
+> **Networking notes:** Place load balancers and Route 53 DNS in front of the environment to serve a custom domain over HTTPS. For private RDS deployments, ensure the application subnets have the correct route tables/NAT gateways for outbound traffic and that security groups allow bidirectional traffic between the app and database tiers.
 
 ### Installation Steps
 
@@ -136,6 +272,50 @@ The seed command inserts example materials into the database so the
 materials through the admin panel. If the `materials` table is empty,
 the marketplace grid will not show any cards.
 
+## API Routes
+
+All API endpoints use **lowercase, case-sensitive** paths. Using a different
+casing (for example, `/api/Auth/Login`) will result in a 404 error. Common
+paths include:
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/user`
+- `GET /api/materials`
+- `GET /api/materials/:id/download`
+- `POST /create-order`
+- `POST /confirm-success`
+
+Requests with incorrect casing will receive a helpful error message indicating
+the expected path.
+
+### Running Tests
+
+Run the automated test suite:
+
+```bash
+npm test
+```
+
+Check linting and TypeScript types:
+
+```bash
+npm run lint
+npm run check
+```
+
+### Customizing the Error Boundary
+
+The client application wraps its router with an `ErrorBoundary`. You can change the fallback UI by passing a `fallback` element:
+
+```tsx
+<ErrorBoundary fallback={<div>Custom error message</div>}>
+  <Router />
+</ErrorBoundary>
+```
+
+
 ## 🏗️ Complete Technology Stack
 
 ### **Core Technologies**
@@ -143,7 +323,7 @@ the marketplace grid will not show any cards.
 - **Backend**: Node.js + Express.js + TypeScript  
 - **Database**: PostgreSQL with Drizzle ORM
 - **Authentication**: Email/Password + JWT tokens
-- **Payment**: Stripe (Cards, UPI, Net Banking)
+- **Payment**: Razorpay (Cards, UPI, Net Banking)
 - **File Storage**: Local disk storage (`./uploads/`)
 - **UI Framework**: shadcn/ui + Radix UI components
 
@@ -158,95 +338,17 @@ the marketplace grid will not show any cards.
 
 ## ⚙️ Configuration Requirements
 
-### **Essential Environment Variables**
-```env
-# Database Connection (Required)
-DATABASE_URL=postgresql://username:password@host:port/database
-
-# Security (Required)
-SESSION_SECRET=your_32_character_random_secret_key
-NODE_ENV=production
-
-# Payment Processing (Required for transactions)
-STRIPE_SECRET_KEY=sk_live_your_stripe_secret_key
-VITE_STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_your_stripe_publishable_key
-
-# Optional legacy Stripe keys
-STRIPE_TEST_SECRET_KEY=sk_test_your_test_secret_key
-STRIPE_LIVE_SECRET_KEY=sk_live_your_live_secret_key
-STRIPE_API_VERSION=2024-03-15
-
-# Admin login for simple routes
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD_HASH=$2a$10$hashed_password_here
-
-# Replit authentication (optional)
-REPLIT_DOMAINS=your-project.username.repl.co
-REPL_ID=your_repl_id
-ISSUER_URL=https://replit.com/oidc
-
-# Application Settings
-USE_SIMPLE_ROUTES=false
-```
-
 ### **Payment System Integration**
 
-#### **Step 1: Create Stripe Account**
-1. Go to https://stripe.com and create an account
-2. Complete account verification (required for live payments)
-3. Navigate to Dashboard → Developers → API keys
-
-#### **Step 2: Get Your API Keys**
-**For Development (Test Mode):**
-```env
-STRIPE_SECRET_KEY=sk_test_51ABC123...your_test_secret_key
-VITE_STRIPE_PUBLISHABLE_KEY_TEST=pk_test_51ABC123...your_test_publishable_key
-```
-
-**For Production (Live Mode):**
-```env
-STRIPE_SECRET_KEY=sk_live_51ABC123...your_live_secret_key
-VITE_STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_51ABC123...your_live_publishable_key
-```
-
-#### **Step 3: Enable Indian Payment Methods**
-1. Go to Dashboard → Settings → Payment methods
-2. Enable these payment methods:
-   - Cards (Visa, Mastercard, RuPay)
-   - UPI (for PhonePe, Google Pay, Paytm, BHIM)
-   - Net Banking
-   - Digital Wallets
-
-#### **Step 4: Configure Your Environment**
-Add to your `.env` file:
-```env
-# For Development
-STRIPE_SECRET_KEY=sk_test_your_actual_test_key_here
-VITE_STRIPE_PUBLISHABLE_KEY_TEST=pk_test_your_actual_test_key_here
-
-# For Production (uncomment when going live)
-# STRIPE_SECRET_KEY=sk_live_your_actual_live_key_here
-# VITE_STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_your_actual_live_key_here
-```
-
-#### **Step 5: Test Payment Flow**
-1. Use test card: `4111 1111 1111 1111`
-2. Any future expiry date (e.g., 12/28)
-3. Any 3-digit CVV (e.g., 123)
-4. For UPI testing: Use `test@paytm` or any test UPI ID
-
-**Supported Payment Methods:**
-- Credit/Debit Cards (Visa, Mastercard, RuPay)
-- UPI payments (PhonePe, Google Pay, Paytm, BHIM UPI)
-- Net Banking (All major Indian banks)
-- Digital Wallets (Paytm, MobiKwik, etc.)
+Razorpay is used to process all payments. Provide your RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in the environment. The checkout page will load Razorpay's script and handle payment verification on the server.
 
 ### **File Storage System**
-- **Location**: `./uploads/` directory (auto-created)
+- **Location**: `./uploads/` directory (auto-created, not served by Express)
+- **Cleanup**: Remove unused files periodically or when materials are deleted
 - **File Types**: PDF only (10MB maximum)
 - **Access Control**: Admin upload, user download after purchase
 - **Naming Convention**: `file-timestamp-random.pdf`
-- **Security**: MIME type validation, size limits, admin-only uploads
+- **Security**: MIME type validation, size limits, admin-only uploads. Consider scanning uploads for malware or storing them in a non-executable storage bucket.
 
 ### **Authentication Architecture**
 - **User System**: Email/password registration with bcrypt hashing
@@ -264,23 +366,29 @@ VITE_STRIPE_PUBLISHABLE_KEY_TEST=pk_test_your_actual_test_key_here
 
 #### UPI Payment Setup
 
-UPI payments are processed through Stripe's UPI integration:
+UPI payments are processed through Razorpay:
 
-1. **Enable UPI in Stripe Dashboard**
-   - Go to Settings → Payment methods
-   - Enable UPI payments for India
+1. **Enable UPI in Razorpay Dashboard**
+   - Go to **Settings → Payment Methods → UPI**
+   - Ensure UPI is enabled for both Test and Live modes as required
 
-2. **Test UPI IDs for Development**
-   - `test@upi` - Success
-   - `demo@paytm` - Success
-   - `failure@upi` - Failure (for testing)
+2. **Generate Razorpay API Keys**
+   - Navigate to **Settings → API Keys**
+   - Create separate key pairs for Test and Live modes and update `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`
+
+3. **Configure Razorpay Webhooks (Recommended)**
+   - Go to **Settings → Webhooks**
+   - Add your webhook endpoint (for example, `/api/razorpay/webhook`) and define `RAZORPAY_WEBHOOK_SECRET`
+   - Subscribe to events like `payment.captured`, `payment.failed`, and `order.paid`
+
+Refer to the Razorpay documentation for up-to-date test card numbers, UPI IDs, and wallet credentials when exercising the checkout in Test mode.
 
 #### Payment Flow
 
 1. User selects materials and proceeds to checkout
 2. Payment options are presented (UPI/Cards/Net Banking)
-3. Stripe processes the payment securely
-4. On success, purchase is recorded in database
+3. Razorpay creates an order and securely processes the payment
+4. The server verifies the Razorpay signature before recording the purchase in the database
 5. User gets instant access to download materials
 
 ### Admin System Setup
@@ -509,9 +617,7 @@ In Vercel dashboard, add these environment variables:
 ```
 DATABASE_URL=your_postgres_connection_string
 SESSION_SECRET=your_strong_session_secret
-STRIPE_SECRET_KEY=sk_live_your_stripe_secret
-VITE_STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_your_stripe_publishable
-USE_SIMPLE_ROUTES=false
+VERBOSE_LOGGING=false
 ```
 
 **Step 4: Deploy**
@@ -535,10 +641,8 @@ Add in Railway dashboard:
 ```
 DATABASE_URL=postgresql://postgres:password@host:port/database
 SESSION_SECRET=your_strong_session_secret_here
-STRIPE_SECRET_KEY=sk_live_your_stripe_secret_key
-VITE_STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_your_stripe_publishable_key
 NODE_ENV=production
-USE_SIMPLE_ROUTES=false
+VERBOSE_LOGGING=false
 ```
 
 **Step 4: Deploy**
@@ -598,7 +702,6 @@ services:
     value: ${db.DATABASE_URL}
   - key: SESSION_SECRET
     type: SECRET
-  - key: STRIPE_SECRET_KEY
     type: SECRET
 databases:
 - name: db
@@ -632,9 +735,7 @@ web: npm start
 ```bash
 heroku config:set NODE_ENV=production
 heroku config:set SESSION_SECRET=your_secret_here
-heroku config:set STRIPE_SECRET_KEY=sk_live_your_key
-heroku config:set VITE_STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_your_key
-heroku config:set USE_SIMPLE_ROUTES=false
+heroku config:set VERBOSE_LOGGING=false
 ```
 
 **Step 4: Deploy**
@@ -674,7 +775,7 @@ git push heroku main
 ```env
 # Production Configuration
 NODE_ENV=production
-USE_SIMPLE_ROUTES=false
+VERBOSE_LOGGING=false
 
 # Database
 DATABASE_URL=postgresql://username:password@host:port/database
@@ -682,9 +783,10 @@ DATABASE_URL=postgresql://username:password@host:port/database
 # Authentication
 SESSION_SECRET=your_very_strong_secret_key_minimum_32_characters
 
-# Stripe Live Keys (for production payments)
-STRIPE_SECRET_KEY=sk_live_your_actual_stripe_secret_key
-VITE_STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_your_actual_stripe_publishable_key
+# Razorpay Live Keys (for production payments)
+RAZORPAY_KEY_ID=rzp_live_your_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_live_secret
+RAZORPAY_WEBHOOK_SECRET=your_live_webhook_secret
 
 # Optional: Custom Domain
 CUSTOM_DOMAIN=yourdomain.com
@@ -694,7 +796,7 @@ CUSTOM_DOMAIN=yourdomain.com
 
 - [ ] Database schema deployed (`npm run db:push`)
 - [ ] Environment variables configured
-- [ ] Stripe account verified and live keys obtained
+- [ ] Razorpay account verified and live keys obtained
 - [ ] Domain name configured (if using custom domain)
 - [ ] SSL certificate enabled
 - [ ] Admin user created in production database
@@ -722,7 +824,7 @@ CUSTOM_DOMAIN=yourdomain.com
    ```
 
 4. **Test Payment Flow**
-   - Make a small test purchase with live Stripe keys
+   - Make a small test purchase with live Razorpay keys
    - Verify payment confirmation emails
    - Check database records for purchase data
 
@@ -790,7 +892,7 @@ CUSTOM_DOMAIN=yourdomain.com
 
 2. **Performance Monitoring**
    - Google Analytics for user tracking
-   - Stripe Dashboard for payment analytics
+- Razorpay Dashboard for payment analytics
    - Database monitoring through provider dashboard
 
 ### Backup Strategy
@@ -810,31 +912,31 @@ CUSTOM_DOMAIN=yourdomain.com
 1. **Production Security**
    - Enable HTTPS enforcement
    - Configure security headers
-   - Implement rate limiting
+   - Rate limiting: 100 requests per 15 minutes on `/api/auth/*` and `/api/admin/*`
    - Regular dependency updates
 
-2. **Stripe Security**
-   - Use webhook endpoints for payment confirmation
-   - Implement proper error handling
-   - Monitor for suspicious transactions
+2. **Razorpay Security**
+   - Verify webhook signatures with `RAZORPAY_WEBHOOK_SECRET`
+   - Implement proper error handling for Razorpay order and payment APIs
+   - Monitor the Razorpay Dashboard for suspicious transactions
 
 ### Security Considerations
 
 - Use strong session secrets in production
 - Enable HTTPS for all payment transactions
 - Regularly update dependencies for security patches
-- Implement rate limiting for API endpoints
+- Rate limiting in place for `/api/auth/*` and `/api/admin/*` (100 requests/15 minutes)
 - Use environment variables for all sensitive data
 - Enable database connection pooling
 - Implement proper error logging and monitoring
 
 ## Payment Security
 
-### Stripe Security Features
-- **PCI Compliance**: Stripe handles all PCI compliance requirements
-- **3D Secure**: Automatic 3D Secure authentication for card payments
-- **Fraud Detection**: Built-in fraud detection and prevention
-- **Encryption**: All payment data is encrypted in transit and at rest
+### Razorpay Security Features
+- **PCI DSS Level 1 Compliance**: Razorpay maintains PCI DSS Level 1 certification
+- **3D Secure & OTP**: Card payments use issuer-backed 3D Secure/OTP flows where required
+- **Fraud Monitoring**: Risk engine flags suspicious transactions for review
+- **Encryption**: Payment data is encrypted in transit and at rest
 
 ### UPI Security
 - **Bank-Grade Security**: UPI transactions use bank-level security protocols
@@ -846,9 +948,9 @@ CUSTOM_DOMAIN=yourdomain.com
 ### Common Issues
 
 1. **Payment Processing Unavailable**
-   - Ensure Stripe API keys are correctly configured
-   - Verify environment variables are loaded
-   - Check Stripe dashboard for any account issues
+   - Ensure Razorpay API keys are correctly configured for the current mode (Test/Live)
+   - Verify environment variables are loaded, including `RAZORPAY_WEBHOOK_SECRET`
+   - Check the Razorpay Dashboard for any account issues or disabled payment methods
 
 2. **Database Connection Errors**
    - Verify DATABASE_URL format and credentials
@@ -903,13 +1005,13 @@ This project is proprietary software. All rights reserved.
 ### Payment Flow Architecture
 
 1. **User Checkout**: User selects materials and proceeds to payment
-2. **Payment Intent**: Stripe creates a secure payment intent
+2. **Order Creation**: The server requests a Razorpay order for the selected materials
 3. **Method Selection**: User chooses preferred payment method
-4. **Authentication**: 
+4. **Authentication**:
    - Cards: 3D Secure authentication
    - UPI: Biometric/PIN verification in UPI app
    - Net Banking: Bank login credentials
-5. **Processing**: Stripe processes payment with banking partners
+5. **Processing**: Razorpay processes the payment with issuing banks and UPI providers
 6. **Confirmation**: Real-time payment status and receipt
 7. **Access Grant**: Immediate access to purchased materials
 

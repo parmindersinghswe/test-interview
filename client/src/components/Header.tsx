@@ -1,8 +1,10 @@
 import { Link, useLocation } from 'wouter';
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserAuth } from '@/hooks/useUserAuth';
 import { useTheme } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
+import { apiRequest } from '@/lib/queryClient';
 import { 
   Moon, 
   Sun, 
@@ -18,8 +20,8 @@ export function Header() {
   const { user: userAuthUser, isAuthenticated: isUserAuthenticated, logoutMutation } = useUserAuth();
   const { theme, toggleTheme } = useTheme();
 
-
   const [location] = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isActive = (path: string) => location === path;
 
@@ -115,15 +117,10 @@ export function Header() {
                       logoutMutation.mutate();
                     } else {
                       try {
-                        // Clear all auth data from localStorage
-                        localStorage.removeItem('admin-token');
-                        localStorage.removeItem('adminAuth');
-                        await fetch('/api/test-logout', { method: 'POST' });
-                        // Redirect to homepage
+                        await apiRequest('POST', '/api/auth/logout');
                         window.location.href = '/';
                       } catch (error) {
                         console.error('Logout failed:', error);
-                        // Even if fetch fails, clear localStorage and redirect
                         window.location.href = '/';
                       }
                     }
@@ -133,20 +130,84 @@ export function Header() {
                 </Button>
               </div>
             ) : (
-              <Link href="/auth">
-                <Button>
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Login
-                </Button>
-              </Link>
+              <>
+                <Link href="/login">
+                  <Button>
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Login
+                  </Button>
+                </Link>
+                <Link href="/admin-login">
+                  <Button variant="outline">
+                    Admin Login
+                  </Button>
+                </Link>
+              </>
             )}
 
             {/* Mobile menu button */}
-            <Button variant="outline" size="icon" className="md:hidden">
+            <Button
+              variant="outline"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-menu"
+              aria-label="Toggle navigation menu"
+            >
               <Menu className="h-4 w-4" />
             </Button>
           </div>
         </div>
+        {/* Mobile navigation menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden" id="mobile-menu">
+            <div className="space-y-1 pb-3">
+              <Link href="/">
+                <Button
+                  variant={isActive('/') ? 'default' : 'ghost'}
+                  className="w-full justify-start text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Home
+                </Button>
+              </Link>
+              <Link href="/materials">
+                <Button
+                  variant={isActive('/materials') ? 'default' : 'ghost'}
+                  className="w-full justify-start text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Materials
+                </Button>
+              </Link>
+              {isAuthenticated && (
+                <>
+                  <Link href="/my-purchases">
+                    <Button
+                      variant={isActive('/my-purchases') ? 'default' : 'ghost'}
+                      className="w-full justify-start text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      My Purchases
+                    </Button>
+                  </Link>
+                  {(user as any)?.isAdmin && (
+                    <Link href="/admin">
+                      <Button
+                        variant={isActive('/admin') ? 'default' : 'ghost'}
+                        className="w-full justify-start text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Admin Panel
+                      </Button>
+                    </Link>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </nav>
     </header>
   );

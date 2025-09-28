@@ -5,6 +5,7 @@ import {
   cartItems,
   reviews,
   uploads,
+  adminSessions,
   type User,
   type UpsertUser,
   type Material,
@@ -17,10 +18,12 @@ import {
   type InsertReview,
   type Upload,
   type InsertUpload,
-} from "@shared/schema";
-import { db } from "./db";
-import { eq, desc, and, ilike, or } from "drizzle-orm";
+  type AdminSession,
+} from "../shared/schema.js";
+import { db } from "./db.js";
+import { eq, desc, and, ilike, or, lt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
@@ -59,6 +62,7 @@ export interface IStorage {
   // Upload operations (Admin CMS)
   getAllUploads(): Promise<Upload[]>;
   getUploadsByTechnology(technology: string): Promise<Upload[]>;
+  getUpload(id: number): Promise<Upload | undefined>;
   createUpload(upload: InsertUpload): Promise<Upload>;
   deleteUpload(id: number): Promise<void>;
   updateUploadStatus(id: number, isActive: boolean): Promise<void>;
@@ -66,6 +70,12 @@ export interface IStorage {
   // Admin operations
   setUserRole(userId: string, role: string): Promise<void>;
   isAdmin(userId: string): Promise<boolean>;
+
+  // Admin session operations
+  createAdminSession(userId: string, ttlMs?: number): Promise<string>;
+  getAdminSession(token: string): Promise<AdminSession | undefined>;
+  deleteAdminSession(token: string): Promise<void>;
+  cleanupExpiredAdminSessions(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -98,7 +108,7 @@ export class DatabaseStorage implements IStorage {
 
   async createUserWithPassword(userData: { email: string; password: string; firstName: string; lastName: string }): Promise<User> {
     const hashedPassword = await bcrypt.hash(userData.password, 10);
-    const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const userId = crypto.randomUUID();
     
     const [user] = await db
       .insert(users)
@@ -234,7 +244,9 @@ export class DatabaseStorage implements IStorage {
         userId: purchases.userId,
         materialId: purchases.materialId,
         price: purchases.price,
-        stripePaymentIntentId: purchases.stripePaymentIntentId,
+        razorpayPaymentId: purchases.razorpayPaymentId,
+        razorpayOrderId: purchases.razorpayOrderId,
+        razorpaySignature: purchases.razorpaySignature,
         purchasedAt: purchases.purchasedAt,
         material: materials,
       })
@@ -251,7 +263,9 @@ export class DatabaseStorage implements IStorage {
         userId: purchases.userId,
         materialId: purchases.materialId,
         price: purchases.price,
-        stripePaymentIntentId: purchases.stripePaymentIntentId,
+        razorpayPaymentId: purchases.razorpayPaymentId,
+        razorpayOrderId: purchases.razorpayOrderId,
+        razorpaySignature: purchases.razorpaySignature,
         purchasedAt: purchases.purchasedAt,
         material: materials,
         user: users,
@@ -265,7 +279,14 @@ export class DatabaseStorage implements IStorage {
   async createPurchase(purchase: InsertPurchase): Promise<Purchase> {
     const [newPurchase] = await db
       .insert(purchases)
-      .values(purchase)
+      .values({
+        userId: purchase.userId,
+        materialId: purchase.materialId,
+        price: purchase.price,
+        razorpayPaymentId: purchase.razorpayPaymentId,
+        razorpayOrderId: purchase.razorpayOrderId,
+        razorpaySignature: purchase.razorpaySignature,
+      })
       .returning();
     return newPurchase;
   }
@@ -328,6 +349,14 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(uploads.createdAt));
   }
 
+  async getUpload(id: number): Promise<Upload | undefined> {
+    const [upload] = await db
+      .select()
+      .from(uploads)
+      .where(eq(uploads.id, id));
+    return upload;
+  }
+
   async createUpload(upload: InsertUpload): Promise<Upload> {
     const [newUpload] = await db
       .insert(uploads)
@@ -361,6 +390,35 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(eq(users.id, userId));
     return user?.role === 'admin';
+  }
+
+  // Admin session operations
+  async createAdminSession(userId: string, ttlMs = 24 * 60 * 60 * 1000): Promise<string> {
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + ttlMs);
+    await db.insert(adminSessions).values({ token, userId, expiresAt });
+    return token;
+  }
+
+  async getAdminSession(token: string): Promise<AdminSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(adminSessions)
+      .where(eq(adminSessions.token, token));
+    if (!session) return undefined;
+    if (session.expiresAt < new Date()) {
+      await db.delete(adminSessions).where(eq(adminSessions.token, token));
+      return undefined;
+    }
+    return session;
+  }
+
+  async deleteAdminSession(token: string): Promise<void> {
+    await db.delete(adminSessions).where(eq(adminSessions.token, token));
+  }
+
+  async cleanupExpiredAdminSessions(): Promise<void> {
+    await db.delete(adminSessions).where(lt(adminSessions.expiresAt, new Date()));
   }
 }
 

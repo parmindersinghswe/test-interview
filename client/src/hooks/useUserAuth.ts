@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { fetchCsrfToken } from "@/lib/csrf";
 import { useToast } from "@/hooks/use-toast";
+import { getHttpStatusMessage } from "@/lib/language";
 import { useLocation } from "wouter";
+import { useEffect } from "react";
+import { useLanguage } from "@shared/LanguageProvider";
 
 interface User {
   id: string;
@@ -9,45 +13,40 @@ interface User {
   firstName: string;
   lastName: string;
   role: string;
+  isAdmin: boolean;
 }
 
 interface AuthResponse {
   user: User;
-  token: string;
 }
 
 export function useUserAuth() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const { language } = useLanguage();
+
+  const parseError = (error: Error): string => {
+    const match = error.message.match(/^(\d{3}):\s*(.*)$/);
+    const status = match ? parseInt(match[1], 10) : undefined;
+    const serverMsg = match ? match[2] : error.message;
+    return (status && getHttpStatusMessage(status, language)) || serverMsg;
+  };
 
   // Get current user
   const { data: user, isLoading } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      if (!token) {
-        return null;
-      }
-
       try {
-        const res = await fetch("/api/auth/user", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
+        const res = await fetch("/api/auth/user", { credentials: "include" });
+        if (res.status === 401) {
+          return null;
+        }
         if (!res.ok) {
-          if (res.status === 401) {
-            localStorage.removeItem("authToken");
-            return null;
-          }
           throw new Error("Failed to fetch user");
         }
-
         return await res.json();
-      } catch (error) {
-        localStorage.removeItem("authToken");
+      } catch {
         return null;
       }
     },
@@ -56,16 +55,22 @@ export function useUserAuth() {
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
 
+  useEffect(() => {
+    if (user) {
+      fetchCsrfToken();
+    }
+  }, [user]);
+
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
       const res = await apiRequest("POST", "/api/auth/login", credentials);
       return await res.json() as AuthResponse;
     },
-    onSuccess: (data) => {
-      localStorage.setItem("authToken", data.token);
+    onSuccess: async (data) => {
       queryClient.setQueryData(["/api/auth/user"], data.user);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      await fetchCsrfToken();
       toast({
         title: "Login Successful",
         description: `Welcome back, ${data.user.firstName}!`,
@@ -74,7 +79,7 @@ export function useUserAuth() {
     onError: (error: Error) => {
       toast({
         title: "Login Failed",
-        description: error.message,
+        description: parseError(error),
         variant: "destructive",
       });
     },
@@ -86,10 +91,10 @@ export function useUserAuth() {
       const res = await apiRequest("POST", "/api/auth/register", userData);
       return await res.json() as AuthResponse;
     },
-    onSuccess: (data) => {
-      localStorage.setItem("authToken", data.token);
+    onSuccess: async (data) => {
       queryClient.setQueryData(["/api/auth/user"], data.user);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      await fetchCsrfToken();
       toast({
         title: "Registration Successful",
         description: `Welcome to DevInterview, ${data.user.firstName}!`,
@@ -98,7 +103,7 @@ export function useUserAuth() {
     onError: (error: Error) => {
       toast({
         title: "Registration Failed",
-        description: error.message,
+        description: parseError(error),
         variant: "destructive",
       });
     },
@@ -107,18 +112,9 @@ export function useUserAuth() {
   // Logout mutation
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem("authToken");
-      if (token) {
-        await fetch("/api/auth/logout", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      }
+      await apiRequest("POST", "/api/auth/logout");
     },
     onSuccess: () => {
-      localStorage.removeItem("authToken");
       queryClient.setQueryData(["/api/auth/user"], null);
       queryClient.clear();
       toast({
@@ -129,8 +125,6 @@ export function useUserAuth() {
       navigate("/");
     },
     onError: () => {
-      // Even if logout fails on server, clear local data
-      localStorage.removeItem("authToken");
       queryClient.setQueryData(["/api/auth/user"], null);
       queryClient.clear();
     },
