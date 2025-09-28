@@ -491,6 +491,10 @@ const originalPrice = priceFloat + (priceFloat * 15 / 100);
     }
   });
 
+    app.get("/api/test", async(req: any, res)=>{
+    return res.json({Message: "This is the testing Api"});
+  });
+
   app.get('/api/current-user', async (req: any, res) => {
   const authHeader = req.headers.authorization;
   let userId: string | null = null;
