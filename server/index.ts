@@ -6,6 +6,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import serverless from 'serverless-http';
 
 // ES Module-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -87,15 +88,20 @@ app.use((req, res, next) => {
   });
 
   // ✅ Vite dev server for development only
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+  // if (app.get("env") === "development") {
+  //   await setupVite(app, server);
+  // } else {
+  //   serveStatic(app);
+  // }
+
+
 
   // ✅ Final: Force IPv4 for Windows compatibility
-  const port = Number(process.env.PORT) || 5000;
-  server.listen(5000, '127.0.0.1', () => {
-    log(`✅ Server running at http://127.0.0.1:${port}`);
-  });
+  // const port = Number(process.env.PORT) || 5000;
+  // server.listen(5000, '127.0.0.1', () => {
+  //   log(`✅ Server running at http://127.0.0.1:${port}`);
+  // });
 })();
+
+  export default serverless(app);
+  

@@ -12,7 +12,7 @@ import crypto from 'crypto';
 // Simple in-memory admin sessions
 const adminSessions = new Map<string, any>();
 
-export async function registerSimpleRoutes(app: Express): Promise<Server> {
+export async function registerSimpleRoutes(app: Express): Promise<Express> {
 
   // Simple admin login - no complex session middleware
   app.post('/api/admin-login', async (req, res) => {
@@ -117,6 +117,8 @@ export async function registerSimpleRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+
   // User Login
   app.post('/api/auth/login', async (req, res) => {
     try {
@@ -162,6 +164,7 @@ export async function registerSimpleRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to logout" });
     }
   });
+
 
   // Get current user
   app.get('/api/auth/user', simpleAuthMiddleware, async (req: any, res) => {
@@ -761,6 +764,5 @@ const originalPrice = priceFloat + (priceFloat * 15 / 100);
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+ return app;
 }

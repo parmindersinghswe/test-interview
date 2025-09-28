@@ -74,7 +74,7 @@ const isAdmin = async (req: any, res: any, next: any) => {
   next();
 };
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express): Promise<Express> {
   // Simple in-memory session store for demo
   const activeSessions = new Map<string, any>();
   
@@ -597,6 +597,5 @@ export async function registerRoutes(app: Express): Promise<Server> {
 //   key_secret: process.env.RAZORPAY_KEY_SECRET!,
 // });});
 
-  const httpServer = createServer(app);
-  return httpServer;
+ return app;
 }
