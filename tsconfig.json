@@ -14,7 +14,7 @@
     "incremental": true,
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
     "noEmit": false,
-    "module": "ESNext",
+    "module": "nodenext",
     "target": "ES2022", // ✅ Added
     "downlevelIteration": true, // ✅ Added
     "strict": true,
@@ -26,7 +26,7 @@
     "jsx": "preserve",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "allowImportingTsExtensions": true,
+    "allowImportingTsExtensions": false,
     "moduleResolution": "NodeNext",
     "baseUrl": ".",
     "types": [

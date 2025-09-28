@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import compression from "compression";
 import { registerRoutes } from "./routes.js";
-import { setupVite, serveStatic, log } from "./vite";
+import { setupVite, serveStatic, log } from "./vite.js";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import { fileURLToPath } from "url";

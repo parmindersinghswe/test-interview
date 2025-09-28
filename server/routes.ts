@@ -4,11 +4,11 @@ import Stripe from "stripe";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { storage } from "./storage.js";
+import { setupAuth, isAuthenticated } from "./replitAuth.js";
 // Removed complex auth imports to avoid conflicts
-import { insertMaterialSchema, insertCartItemSchema, insertPurchaseSchema, insertReviewSchema, insertUploadSchema } from "@shared/schema";
-import { z } from "zod";
+import { insertMaterialSchema, insertCartItemSchema, insertPurchaseSchema, insertReviewSchema, insertUploadSchema } from "@shared/schema.js";
+// import { z } from "zod";
 
 // Initialize Stripe only if a secret key is available
 let stripe: Stripe | null = null;
@@ -155,9 +155,9 @@ export function registerRoutes(app: Express): Express {
       res.json(cartItem);
     } catch (error) {
       console.error("Error adding to cart:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
-      }
+      // if (error instanceof z.ZodError) {
+      //   return res.status(400).json({ message: "Invalid request data" });
+      // }
       res.status(500).json({ message: "Failed to add to cart" });
     }
   });
@@ -343,9 +343,9 @@ export function registerRoutes(app: Express): Express {
       res.json(review);
     } catch (error) {
       console.error("Error creating review:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
-      }
+      // if (error instanceof z.ZodError) {
+      //   return res.status(400).json({ message: "Invalid request data" });
+      // }
       res.status(500).json({ message: "Failed to create review" });
     }
   });
