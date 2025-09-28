@@ -1,13 +1,13 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import compression from "compression";
-import { registerRoutes } from "./routes";
+import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic, log } from "./vite";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import serverless from 'serverless-http';
-import { registerSimpleRoutes } from "./routes-simple";
+import { registerSimpleRoutes } from "./routes-simple.js";
 
 // ES Module-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
